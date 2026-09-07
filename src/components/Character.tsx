@@ -128,7 +128,7 @@ const Character: React.FC<CharacterProps> = ({ agent, idleDurationMs = 0, zIndex
   void theme
 
   const effectSrc = isTyping
-    ? '/sprites/effects/typing.png'
+    ? 'sprites/effects/typing.png'
     : getEffect(agent.state, idleDurationMs, agent.statusText, agent.id, agent.task, agent.role)
 
   return (

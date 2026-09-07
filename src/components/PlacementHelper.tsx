@@ -58,7 +58,7 @@ interface EditableWaypoint {
 }
 
 const PlacementHelper: React.FC = () => {
-  const [bgImage, setBgImage] = useState('/rooms/office-day.png')
+  const [bgImage, setBgImage] = useState('rooms/office-day.png')
   const [placed, setPlaced] = useState<PlacedItem[]>([])
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
   const [mode, setMode] = useState<PlacementMode>('furniture')
@@ -322,8 +322,8 @@ const PlacementHelper: React.FC = () => {
             onChange={e => setBgImage(e.target.value)}
             style={{ background: '#222', color: '#ddd', border: '1px solid #444', padding: '2px 4px', fontSize: 10 }}
           >
-            <option value="/rooms/office-day.png">Office Day</option>
-            <option value="/rooms/office-night.png">Office Night</option>
+            <option value="rooms/office-day.png">Office Day</option>
+            <option value="rooms/office-night.png">Office Night</option>
           </select>
 
           <div style={{ width: 1, height: 16, background: '#333', margin: '0 4px' }} />
@@ -511,7 +511,7 @@ const PlacementHelper: React.FC = () => {
                         }}
                       >
                         <img
-                          src={`/sprites/characters/${charBase}-${dir}.png`}
+                          src={`sprites/characters/${charBase}-${dir}.png`}
                           alt={`Spot ${i + 1}`}
                           style={{ height: i === 0 ? 85 : 78, width: 'auto', imageRendering: 'pixelated', display: 'block' }}
                           draggable={false}

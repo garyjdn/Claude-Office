@@ -129,7 +129,7 @@ export function getCharacterBaseForRole(role: string, defaultBase: string): stri
 }
 
 export function getSpriteDir(): string {
-  return state.name === 'office' ? '/sprites/office/characters' : '/sprites/characters'
+  return state.name === 'office' ? 'sprites/office/characters' : 'sprites/characters'
 }
 
 /** Kept signature-compatible for existing callers — agentId ignored; role is the key. */
@@ -140,15 +140,15 @@ export function getSpritePath(_agentId: string, role: string, defaultBase: strin
 
 export function getRoomImage(phase: 'day' | 'night'): string {
   if (state.name === 'office') {
-    return phase === 'night' ? '/rooms/office-night-dm.png' : '/rooms/office-day-dm.png'
+    return phase === 'night' ? 'rooms/office-night-dm.png' : 'rooms/office-day-dm.png'
   }
-  return phase === 'night' ? '/rooms/office-night.png' : '/rooms/office-day.png'
+  return phase === 'night' ? 'rooms/office-night.png' : 'rooms/office-day.png'
 }
 
 /** Returns the ROLE currently cast as Angela (if any), plus cat sprite path. */
 export function getAngelaCat(): { role: string; catSprite: string } | null {
   if (state.name !== 'office' || !state.angelaRole || !state.angelaCat) return null
-  return { role: state.angelaRole, catSprite: `/sprites/office/cats/${state.angelaCat}.png` }
+  return { role: state.angelaRole, catSprite: `sprites/office/cats/${state.angelaCat}.png` }
 }
 
 /** Human-readable display name for a slug (e.g. "michael-scott" → "Michael Scott") */
@@ -328,35 +328,35 @@ export function displayNameFromSlug(slug: string): string {
 // per-role so the same agent keeps the same prop within a session.
 const OFFICE_PROPS_BY_SLUG: Record<string, string[]> = {
   'michael-scott':   [
-    '/sprites/office/props/worlds-best-boss-mug.png',
-    '/sprites/office/props/dundie-award.png',
-    '/sprites/office/props/golden-ticket-box.png',
-    '/sprites/office/props/prison-mike.png',
-    '/sprites/office/props/no-god-please-no.png',
+    'sprites/office/props/worlds-best-boss-mug.png',
+    'sprites/office/props/dundie-award.png',
+    'sprites/office/props/golden-ticket-box.png',
+    'sprites/office/props/prison-mike.png',
+    'sprites/office/props/no-god-please-no.png',
   ],
   'dwight-schrute':  [
-    '/sprites/office/props/cpr-dummy-mask.png',
-    '/sprites/office/props/schrute-buck.png',
+    'sprites/office/props/cpr-dummy-mask.png',
+    'sprites/office/props/schrute-buck.png',
   ],
-  'jim-halpert':     ['/sprites/office/props/jello-stapler.png'],
-  'stanley-hudson':  ['/sprites/office/props/pretzel-day.png'],
-  'jan-levinson':    ['/sprites/office/props/serenity-by-jan-candle.png'],
+  'jim-halpert':     ['sprites/office/props/jello-stapler.png'],
+  'stanley-hudson':  ['sprites/office/props/pretzel-day.png'],
+  'jan-levinson':    ['sprites/office/props/serenity-by-jan-candle.png'],
   // Why: Finer Things Club members share the prop — Oscar, Pam, and Toby.
-  'oscar-martinez':  ['/sprites/office/props/finer-things-club.png'],
-  'pam-beesly':      ['/sprites/office/props/finer-things-club.png'],
-  'toby-flenderson': ['/sprites/office/props/finer-things-club.png'],
+  'oscar-martinez':  ['sprites/office/props/finer-things-club.png'],
+  'pam-beesly':      ['sprites/office/props/finer-things-club.png'],
+  'toby-flenderson': ['sprites/office/props/finer-things-club.png'],
   // Angela: randomized second cat assigned per-role below — not a prop file.
 }
 
 // Why: generic fallback for remaining cast so every Office character has a prop.
 const OFFICE_GENERIC_PROPS = [
-  '/sprites/office/props/dunder-mifflin-logo.png',
-  '/sprites/office/props/dunder-mifflin-paper-box.png',
-  '/sprites/office/props/schrute-buck.png',
-  '/sprites/office/props/golden-ticket-box.png',
+  'sprites/office/props/dunder-mifflin-logo.png',
+  'sprites/office/props/dunder-mifflin-paper-box.png',
+  'sprites/office/props/schrute-buck.png',
+  'sprites/office/props/golden-ticket-box.png',
 ]
 
-const OFFICE_CATS_PATHS = OFFICE_CATS.map(c => `/sprites/office/cats/${c}.png`)
+const OFFICE_CATS_PATHS = OFFICE_CATS.map(c => `sprites/office/cats/${c}.png`)
 
 // Stable per-role generic prop / head-cat assignment — deterministic hash so it doesn't flicker.
 function hashString(s: string): number {

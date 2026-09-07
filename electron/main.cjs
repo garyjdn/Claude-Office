@@ -124,10 +124,17 @@ function startServer() {
 
   console.log('[main] Spawning server:', serverEntry)
 
-  serverProcess = spawn('node', [serverEntry], {
-    stdio: 'pipe',
-    env: { ...process.env },
-  })
+  // Packaged builds can't assume Node.js is installed — re-run this very
+  // Electron binary as a plain Node process (ELECTRON_RUN_AS_NODE) instead
+  const useBundledNode = app.isPackaged
+  const serverEnv = { ...process.env }
+  if (useBundledNode) serverEnv.ELECTRON_RUN_AS_NODE = '1'
+
+  serverProcess = spawn(
+    useBundledNode ? process.execPath : 'node',
+    [serverEntry],
+    { stdio: 'pipe', env: serverEnv }
+  )
 
   serverProcess.stdout.on('data', (data) => {
     process.stdout.write(`[server] ${data}`)
