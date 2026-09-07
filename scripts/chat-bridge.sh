@@ -8,6 +8,9 @@
 
 SERVER="http://127.0.0.1:3334"
 STATE_DIR="$HOME/.agent-office"
+
+# Python launcher — Windows installs usually expose `python`, not `python3`
+PYTHON="$(command -v python3 || command -v python)"
 LAST_TS_FILE="$STATE_DIR/chat-bridge-last-ts"
 PENDING_FILE="$STATE_DIR/chat-pending"
 
@@ -28,7 +31,7 @@ fi
 
 # Check AI toggle
 AI_STATE=$(curl -sf "$SERVER/chat/cron-state" 2>/dev/null || echo '{}')
-IS_PAUSED=$(echo "$AI_STATE" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('paused') else 'false')" 2>/dev/null || echo "true")
+IS_PAUSED=$(echo "$AI_STATE" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('paused') else 'false')" 2>/dev/null || echo "true")
 
 if [ "$IS_PAUSED" = "true" ]; then
     echo "AI toggle is off — not checking chat"
@@ -39,7 +42,7 @@ fi
 RESPONSE=$(curl -sf "$SERVER/chat?since=$LAST_TS" 2>/dev/null || echo '{"messages":[]}')
 
 # Get user messages (not from Claude or system)
-NEW_MSGS=$(echo "$RESPONSE" | python3 -c "
+NEW_MSGS=$(echo "$RESPONSE" | "$PYTHON" -c "
 import sys, json
 data = json.load(sys.stdin)
 msgs = data.get('messages', [])

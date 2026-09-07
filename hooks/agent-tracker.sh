@@ -16,6 +16,9 @@
 
 SERVER_URL="http://localhost:3334/event"
 
+# Python launcher — Windows installs usually expose `python`, not `python3`
+PYTHON="$(command -v python3 || command -v python)"
+
 # Read the hook payload from stdin
 PAYLOAD=$(cat)
 
@@ -33,7 +36,7 @@ fi
 # Extract common fields and build event JSON in a single Python invocation.
 # All variable data is passed via stdin; no shell variables are interpolated
 # into Python source code.
-EVENT_JSON=$(HOOK_PAYLOAD="$PAYLOAD" python3 - <<'PYEOF'
+EVENT_JSON=$(HOOK_PAYLOAD="$PAYLOAD" "$PYTHON" - <<'PYEOF'
 import json, sys, os, re
 
 try:

@@ -96,7 +96,7 @@ Toggle it off any time with `/the-office` again — state persists in `localStor
 - Slash commands: `/status`, `/agents`, `/help`
 - Chat history persists across restarts (SQLite)
 - Proactive messages — agents announce when they start and finish work
-- Smart macOS notifications for important events
+- Smart desktop notifications for important events (macOS, Windows, Linux)
 
 **Context-Aware AI**
 - Claude knows your current git branch and active agents
@@ -123,6 +123,8 @@ Claude Code ──hook──> Express Server ──WebSocket──> React Fronte
 
 ## Quick Start
 
+### macOS / Linux
+
 ```bash
 # Clone
 git clone https://github.com/W17ant/Claude-Office.git
@@ -130,6 +132,9 @@ cd Claude-Office
 
 # Install
 npm install
+
+# Create your local config (first run only)
+cp office.config.example.json office.config.json
 
 # Start everything (server + frontend + chat watcher)
 bash scripts/start-office.sh
@@ -139,6 +144,48 @@ bash scripts/stop-office.sh
 ```
 
 Open `http://localhost:3333` — the office is ready.
+
+### Windows
+
+**Prerequisites**
+
+| Requirement | Notes |
+|---|---|
+| [Node.js LTS](https://nodejs.org/) | `node --version` to check |
+| [Git for Windows](https://git-scm.com/download/win) | Ships with **Git Bash** — run all commands below from Git Bash, not cmd/PowerShell |
+| Python on PATH | The scripts fall back to `python` when `python3` is absent |
+
+**Setup** (in Git Bash):
+
+```bash
+git clone https://github.com/W17ant/Claude-Office.git
+cd Claude-Office
+
+npm install
+
+# First run only — required, the frontend fails to load without it
+cp office.config.example.json office.config.json
+
+# Start everything: server (3334) + UI (3333) + chat watcher, opens your browser
+bash scripts/start-office.sh
+
+# Stop everything (kills by port via netstat + taskkill)
+bash scripts/stop-office.sh
+```
+
+**Connect Claude Code** — make spawned agents appear in the office live:
+
+```bash
+npm run install-hooks
+```
+
+This adds `PreToolUse` + `PostToolUse` hooks to `~/.claude/settings.json` (a timestamped backup is written first). It records absolute Windows paths (`"C:\Program Files\Git\usr\bin\bash.exe" "D:\...\agent-tracker.sh"`) so the hook works no matter which shell Claude Code uses. Then start a **new** Claude Code session — hooks are read at session start.
+
+**Windows notes**
+
+- All scripts detect the OS automatically — `open` → `explorer.exe`, `lsof` → `netstat`, `kill` → `taskkill`, `osascript` → PowerShell toast. No PowerShell equivalents needed.
+- No Git Bash? `npm run dev:all` (server + Vite, works from any shell) then open `http://localhost:3333?sim` for the demo mode.
+- `npm run build:electron` produces an `.exe` installer (NSIS); `npm run dev:electron` works on Windows too.
 
 ### Auto-Permissions
 
@@ -166,6 +213,8 @@ Add the hook to `~/.claude/settings.json`:
 ```
 
 Now spawn agents in Claude Code and watch them appear in the office.
+
+On Windows, `npm run install-hooks` writes the hook with absolute Windows paths (`"C:\Program Files\Git\bin\bash.exe" "D:\...\agent-tracker.sh"`) so it works no matter which shell Claude Code uses — prefer it over editing the JSON by hand.
 
 ## Customise Your Character
 
@@ -288,7 +337,7 @@ Claude-Office/
 
 ```bash
 npm run dev:electron    # Development
-npm run build:electron  # Build .dmg
+npm run build:electron  # Build .dmg (macOS) / .exe installer (Windows)
 ```
 
 ## License

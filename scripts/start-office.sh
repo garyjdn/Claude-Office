@@ -2,12 +2,14 @@
 # =============================================================================
 # start-office.sh — Start Agent Office (server + UI) and open in browser
 #
-# If the packaged Electron app exists (release/mac/Agent Office.app or the
-# --dir output at release/mac-unpacked/Agent Office.app), launch it directly —
-# the app manages the server internally.
+# If the packaged Electron app exists (release/mac*/Agent Office.app, or the
+# --dir output at release/mac-unpacked / release/win-unpacked), launch it
+# directly — the app manages the server internally.
 #
 # Otherwise fall back to the dev workflow: start the Express server and Vite
 # separately (same behaviour as before).
+#
+# Works on macOS, Linux, and Windows (Git Bash).
 # =============================================================================
 
 set -euo pipefail
@@ -15,8 +17,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
+OS_NAME="$(uname -s)"
+
+# Cross-platform opener: `open` (macOS), `explorer.exe` (Windows/Git Bash),
+# `xdg-open` (Linux). NOTE: explorer.exe always exits 1, even on success —
+# never let its exit code trip `set -e`.
+open_url() {
+    case "$OS_NAME" in
+        Darwin)            open "$1" 2>/dev/null || true ;;
+        MINGW*|MSYS*|CYGWIN*) explorer.exe "$1" >/dev/null 2>&1 || true ;;
+        *)                 xdg-open "$1" >/dev/null 2>&1 || true ;;
+    esac
+}
+
+# Cross-platform launcher for a packaged app / executable
+open_app() {
+    case "$OS_NAME" in
+        Darwin)            open "$1" 2>/dev/null || true ;;
+        MINGW*|MSYS*|CYGWIN*) cmd //c start "" "$(cygpath -w "$1")" >/dev/null 2>&1 || true ;;
+        *)                 "$1" >/dev/null 2>&1 & ;;
+    esac
+}
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 RESET='\033[0m'
 
@@ -24,9 +49,10 @@ cd "$PROJECT_DIR"
 
 # ---------------------------------------------------------------------------
 # Check for a packaged Electron build
-# Electron-builder places the .app at:
+# Electron-builder places the app at:
 #   release/<mac|mac-arm64>/Agent Office.app        (DMG build)
-#   release/mac-unpacked/Agent Office.app           (--dir / pack build)
+#   release/mac-unpacked/Agent Office.app           (--dir / pack build, macOS)
+#   release/win-unpacked/Agent Office.exe           (--dir / pack build, Windows)
 # ---------------------------------------------------------------------------
 
 ELECTRON_APP=""
@@ -34,9 +60,10 @@ ELECTRON_APP=""
 for candidate in \
     "release/mac/Agent Office.app" \
     "release/mac-arm64/Agent Office.app" \
-    "release/mac-unpacked/Agent Office.app"
+    "release/mac-unpacked/Agent Office.app" \
+    "release/win-unpacked/Agent Office.exe"
 do
-    if [ -d "$PROJECT_DIR/$candidate" ]; then
+    if [ -e "$PROJECT_DIR/$candidate" ]; then
         ELECTRON_APP="$PROJECT_DIR/$candidate"
         break
     fi
@@ -45,11 +72,11 @@ done
 if [ -n "$ELECTRON_APP" ]; then
     echo -e "${GREEN}[ok]${RESET} Found packaged app: $ELECTRON_APP"
     echo -e "${CYAN}[...]${RESET} Launching Agent Office..."
-    open "$ELECTRON_APP"
+    open_app "$ELECTRON_APP"
     echo ""
     echo -e "${GREEN}Agent Office launched!${RESET}"
     echo "  The app manages the server internally."
-    echo "  Check /tmp/agent-office-token for the auth token."
+    echo "  Check ~/.agent-office/auth-token for the auth token."
     exit 0
 fi
 
@@ -98,21 +125,30 @@ fi
 # Start chat AI watcher in background (kill any stale ones first)
 WATCHER_PID_FILE="$HOME/.agent-office/chat-watcher.pid"
 # Kill any leftover watcher processes
-pkill -f "chat-ai-watcher.sh" 2>/dev/null || true
-pkill -f "chat-watcher.sh" 2>/dev/null || true
+if command -v pkill >/dev/null 2>&1; then
+    pkill -f "chat-ai-watcher.sh" 2>/dev/null || true
+    pkill -f "chat-watcher.sh" 2>/dev/null || true
+elif [ -f "$WATCHER_PID_FILE" ]; then
+    # Git Bash on Windows: no pkill — fall back to the recorded PID.
+    # It may hold an MSYS pid or a Windows pid, so try kill, then taskkill.
+    STALE_PID="$(cat "$WATCHER_PID_FILE")"
+    kill "$STALE_PID" 2>/dev/null || taskkill //F //PID "$STALE_PID" >/dev/null 2>&1 || true
+fi
 rm -f "$WATCHER_PID_FILE"
-    echo -e "${CYAN}[...]${RESET} Starting chat AI watcher..."
-    bash "$PROJECT_DIR/scripts/chat-ai-watcher.sh" >> /tmp/agent-office-chat-ai.log 2>&1 &
-    sleep 0.5
-    if [ -f "$WATCHER_PID_FILE" ]; then
-        echo -e "${GREEN}[ok]${RESET} Chat AI watcher ready (PID: $(cat "$WATCHER_PID_FILE"))"
-    else
-        echo -e "${YELLOW}[warn]${RESET} Chat AI watcher may not have started"
-    fi
+
+mkdir -p "$HOME/.agent-office"
+echo -e "${CYAN}[...]${RESET} Starting chat AI watcher..."
+bash "$PROJECT_DIR/scripts/chat-ai-watcher.sh" >> "$HOME/.agent-office/chat-ai.log" 2>&1 &
+sleep 0.5
+if [ -f "$WATCHER_PID_FILE" ]; then
+    echo -e "${GREEN}[ok]${RESET} Chat AI watcher ready (PID: $(cat "$WATCHER_PID_FILE"))"
+else
+    echo -e "${YELLOW}[warn]${RESET} Chat AI watcher may not have started"
+fi
 
 # Open in browser
 echo -e "${CYAN}[...]${RESET} Opening Agent Office..."
-open http://localhost:3333
+open_url http://localhost:3333
 
 echo ""
 echo -e "${GREEN}Agent Office is running!${RESET}"

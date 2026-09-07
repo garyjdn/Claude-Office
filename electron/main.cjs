@@ -80,6 +80,37 @@ function waitForServer(retries = 30, intervalMs = 300) {
 }
 
 /**
+ * Poll a URL until it answers with any HTTP response — used to wait for the
+ * Vite dev server, which may still be compiling when Electron starts
+ * (`dev:electron` runs both concurrently, with no cross-platform sleep).
+ * Returns a Promise<boolean>.
+ */
+function waitForHttpOk(url, retries = 40, intervalMs = 500) {
+  return new Promise((resolve) => {
+    let attempts = 0
+
+    function attempt() {
+      attempts++
+      const req = http.get(url, (res) => {
+        res.resume()
+        resolve(true)
+      })
+      req.on('error', () => {
+        if (attempts < retries) setTimeout(attempt, intervalMs)
+        else resolve(false)
+      })
+      req.setTimeout(1000, () => {
+        req.destroy()
+        if (attempts < retries) setTimeout(attempt, intervalMs)
+        else resolve(false)
+      })
+    }
+
+    attempt()
+  })
+}
+
+/**
  * Start the Express/WebSocket server as a child process.
  * In packaged builds the server files are placed in process.resourcesPath/server.
  * In dev the files are at <project-root>/server/index.js.
@@ -191,6 +222,10 @@ async function createWindow() {
   // In dev, load from Vite server; in production, load the built index.html
   const isDev = !app.isPackaged
   if (isDev) {
+    const viteReady = await waitForHttpOk('http://localhost:3333')
+    if (!viteReady) {
+      console.error('[main] Vite dev server never came up on port 3333 — loading anyway')
+    }
     win.loadURL('http://localhost:3333')
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))

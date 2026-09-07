@@ -12,10 +12,20 @@ PID_FILE="$HOME/.agent-office/chat-watcher.pid"
 STATE_DIR="$HOME/.agent-office"
 LAST_TS_FILE="$STATE_DIR/chat-ai-last-ts"
 
+# Python launcher — Windows installs usually expose `python`, not `python3`
+PYTHON="$(command -v python3 || command -v python)"
+
 LOCK_FILE="$STATE_DIR/chat-ai.lock"
 
 mkdir -p "$STATE_DIR"
-echo $$ > "$PID_FILE"
+# Record our PID — on Git Bash/MSYS, $$ is an MSYS pid that tasklist/taskkill
+# cannot see, so record the Windows PID instead (stop-office.sh relies on it)
+if [ -r "/proc/$$/winpid" ]; then
+    WATCHER_PID="$(cat "/proc/$$/winpid")"
+else
+    WATCHER_PID=$$
+fi
+echo "$WATCHER_PID" > "$PID_FILE"
 
 # Initialise last-seen timestamp to now
 if [ -f "$LAST_TS_FILE" ]; then
@@ -25,7 +35,7 @@ else
     echo "$LAST_TS" > "$LAST_TS_FILE"
 fi
 
-echo "[chat-ai] Started (pid $$), polling every ${POLL_INTERVAL}s"
+echo "[chat-ai] Started (pid $WATCHER_PID), polling every ${POLL_INTERVAL}s"
 
 cleanup() { rm -f "$PID_FILE" "$LOCK_FILE"; echo "[chat-ai] Stopped"; exit 0; }
 trap cleanup EXIT INT TERM
@@ -37,14 +47,14 @@ while true; do
     curl -sf "$SERVER/health" > /dev/null 2>&1 || continue
 
     # Check AI toggle
-    IS_PAUSED=$(curl -sf "$SERVER/chat/cron-state" 2>/dev/null | python3 -c "import sys,json; print('true' if json.load(sys.stdin).get('paused') else 'false')" 2>/dev/null || echo "true")
+    IS_PAUSED=$(curl -sf "$SERVER/chat/cron-state" 2>/dev/null | "$PYTHON" -c "import sys,json; print('true' if json.load(sys.stdin).get('paused') else 'false')" 2>/dev/null || echo "true")
     [ "$IS_PAUSED" = "true" ] && continue
 
     # Fetch messages since last seen
     RESPONSE=$(curl -sf "$SERVER/chat?since=$LAST_TS" 2>/dev/null || echo '{"messages":[]}')
 
     # Check for new user messages (not from Claude or system)
-    RESULT=$(echo "$RESPONSE" | python3 -c "
+    RESULT=$(echo "$RESPONSE" | "$PYTHON" -c "
 import sys, json
 data = json.load(sys.stdin)
 msgs = data.get('messages', [])
@@ -80,7 +90,7 @@ if msgs:
     touch "$LOCK_FILE"
 
     # Detect which agent should respond based on keywords
-    AGENT_INFO=$(echo "$RESULT" | python3 -c "
+    AGENT_INFO=$(echo "$RESULT" | "$PYTHON" -c "
 import sys
 msg = sys.stdin.read().lower()
 routes = [
@@ -121,7 +131,7 @@ print('assistant|Claude')
     fi
 
     # Fetch last 10 messages for context
-    CONTEXT=$(curl -sf "$SERVER/chat" 2>/dev/null | python3 -c "
+    CONTEXT=$(curl -sf "$SERVER/chat" 2>/dev/null | "$PYTHON" -c "
 import sys, json
 data = json.load(sys.stdin)
 msgs = data.get('messages', [])[-10:]
@@ -151,12 +161,12 @@ Reply to the latest message naturally. Keep it short (8-12 words). Continue the 
     [ -z "$REPLY" ] && { echo "[chat-ai] Empty reply, skipping"; continue; }
 
     # Truncate to 15 words max
-    REPLY=$(echo "$REPLY" | python3 -c "import sys; w=sys.stdin.read().strip().split(); print(' '.join(w[:15]))")
+    REPLY=$(echo "$REPLY" | "$PYTHON" -c "import sys; w=sys.stdin.read().strip().split(); print(' '.join(w[:15]))")
 
     echo "[chat-ai] Replying as $AGENT_NAME: $REPLY"
 
     # Post reply with agent role and name
-    CHAT_REPLY="$REPLY" CHAT_ROLE="$AGENT_ROLE" CHAT_SENDER="$AGENT_NAME" python3 -c "
+    CHAT_REPLY="$REPLY" CHAT_ROLE="$AGENT_ROLE" CHAT_SENDER="$AGENT_NAME" "$PYTHON" -c "
 import urllib.request, json, os
 data = json.dumps({
     'sender': os.environ.get('CHAT_SENDER', 'Claude'),

@@ -14,14 +14,22 @@
 
 SERVER="http://127.0.0.1:3334"
 POLL_INTERVAL=30
+
+# Python launcher — Windows installs usually expose `python`, not `python3`
+PYTHON="$(command -v python3 || command -v python)"
 LAST_TS=0
 PID_FILE="$HOME/.agent-office/chat-watcher.pid"
 
 mkdir -p "$HOME/.agent-office"
-echo $$ > "$PID_FILE"
+# Record the Windows PID on Git Bash/MSYS so tasklist/taskkill can find us
+if [ -r "/proc/$$/winpid" ]; then
+    echo "$(cat "/proc/$$/winpid")" > "$PID_FILE"
+else
+    echo $$ > "$PID_FILE"
+fi
 
 # Get initial timestamp so we don't reply to old messages
-LAST_TS=$(curl -s "$SERVER/chat" 2>/dev/null | python3 -c "
+LAST_TS=$(curl -s "$SERVER/chat" 2>/dev/null | "$PYTHON" -c "
 import json,sys
 try:
     msgs = json.load(sys.stdin)['messages']
@@ -42,7 +50,7 @@ while true; do
     fi
 
     # Parse and find messages from Antony (not from Claude/system)
-    NEW_MSG=$(echo "$RESPONSE" | python3 -c "
+    NEW_MSG=$(echo "$RESPONSE" | "$PYTHON" -c "
 import json, sys
 try:
     msgs = json.load(sys.stdin)['messages']
@@ -72,7 +80,7 @@ except:
         fi
 
         # Generate a simple contextual reply
-        REPLY=$(CHAT_TEXT="$TEXT" python3 -c "
+        REPLY=$(CHAT_TEXT="$TEXT" "$PYTHON" -c "
 import random, os
 text = os.environ.get('CHAT_TEXT', '').lower().strip()
 
@@ -106,7 +114,7 @@ print(random.choice(replies))
 
         if [ -n "$REPLY" ]; then
             # Post reply (pass via env var to avoid shell quoting issues)
-            CHAT_REPLY="$REPLY" CHAT_SERVER="$SERVER" python3 << 'PYEOF'
+            CHAT_REPLY="$REPLY" CHAT_SERVER="$SERVER" "$PYTHON" << 'PYEOF'
 import urllib.request, json, os
 text = os.environ['CHAT_REPLY']
 server = os.environ['CHAT_SERVER']

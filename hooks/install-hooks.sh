@@ -4,7 +4,9 @@
 #
 # This script:
 #   1. Backs up the existing settings file
-#   2. Adds a PostToolUse hook entry that runs agent-tracker.sh
+#   2. Adds PreToolUse and PostToolUse hook entries that run agent-tracker.sh
+#      (PreToolUse drives agent_spawned / working status, PostToolUse the
+#      completions — you want both)
 #   3. Prints next steps
 #
 # Usage:
@@ -16,7 +18,24 @@ set -euo pipefail
 SETTINGS_FILE="$HOME/.claude/settings.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRACKER_SCRIPT="$SCRIPT_DIR/agent-tracker.sh"
-HOOK_COMMAND="bash \"$TRACKER_SCRIPT\""
+
+# Python launcher — Windows installs usually expose `python`, not `python3`
+PYTHON="$(command -v python3 || command -v python)"
+
+# Build the hook command.
+# On Windows (Git Bash) Claude Code may execute hooks via cmd.exe/PowerShell,
+# which cannot resolve POSIX paths like /d/Workspace/... or find `bash` on
+# PATH — so emit absolute Windows paths for both bash.exe and the script.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        BASH_WIN="$(cygpath -w "$(command -v bash)")"
+        TRACKER_WIN="$(cygpath -w "$TRACKER_SCRIPT")"
+        HOOK_COMMAND="\"$BASH_WIN\" \"$TRACKER_WIN\""
+        ;;
+    *)
+        HOOK_COMMAND="bash \"$TRACKER_SCRIPT\""
+        ;;
+esac
 
 # Colours
 RED='\033[0;31m'
@@ -78,9 +97,9 @@ fi
 # ---------------------------------------------------------------------------
 # Merge hook entry into settings JSON using Python
 # ---------------------------------------------------------------------------
-echo -e "${CYAN}[...]${RESET} Adding PostToolUse hook..."
+echo -e "${CYAN}[...]${RESET} Adding PreToolUse + PostToolUse hooks..."
 
-python3 - "$SETTINGS_FILE" "$HOOK_COMMAND" <<'PYEOF'
+"$PYTHON" - "$SETTINGS_FILE" "$HOOK_COMMAND" <<'PYEOF'
 import json, sys
 
 settings_path = sys.argv[1]
@@ -92,11 +111,8 @@ with open(settings_path, 'r') as f:
     except json.JSONDecodeError:
         settings = {}
 
-# Ensure hooks.PostToolUse exists as a list
 hooks = settings.setdefault('hooks', {})
-post_tool_use = hooks.setdefault('PostToolUse', [])
 
-# New hook entry to add
 new_hook_group = {
     "matcher": "",
     "hooks": [
@@ -107,15 +123,18 @@ new_hook_group = {
     ]
 }
 
-# Check if a hook group already contains this command (double safety)
-already_present = any(
-    any(h.get('command', '') == hook_command for h in group.get('hooks', []))
-    for group in post_tool_use
-    if isinstance(group, dict)
-)
+for event in ('PreToolUse', 'PostToolUse'):
+    event_hooks = hooks.setdefault(event, [])
 
-if not already_present:
-    post_tool_use.append(new_hook_group)
+    # Check if a hook group already contains this command (double safety)
+    already_present = any(
+        any(h.get('command', '') == hook_command for h in group.get('hooks', []))
+        for group in event_hooks
+        if isinstance(group, dict)
+    )
+
+    if not already_present:
+        event_hooks.append(new_hook_group)
 
 with open(settings_path, 'w') as f:
     json.dump(settings, f, indent=2)
@@ -124,7 +143,7 @@ with open(settings_path, 'w') as f:
 print('ok')
 PYEOF
 
-echo -e "${GREEN}[ok]${RESET} Hook added to $SETTINGS_FILE"
+echo -e "${GREEN}[ok]${RESET} Hooks added to $SETTINGS_FILE"
 
 # ---------------------------------------------------------------------------
 # Print next steps
